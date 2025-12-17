@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Energy Management System</title>
+
+    <!-- Chart.js pentru graficele de consum -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { background: #2c3e50; color: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; }
+        .card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .login-form { max-width: 400px; margin: 100px auto; }
+        input, select { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; }
+        button { padding: 12px 16px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        button:hover { background: #2980b9; }
+        .error { color: #e74c3c; margin: 10px 0; }
+        .success { color: #27ae60; margin: 10px 0; }
+        .hidden { display: none; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #34495e; color: white; }
+        .btn-small { padding: 6px 10px; margin: 2px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; width: auto; font-size: 12px; }
+        .btn-success { background: #27ae60; }
+        .btn-warning { background: #f39c12; }
+        .btn-danger { background: #e74c3c; }
+        .logout-btn { float: right; padding: 8px 14px; background: #e74c3c; width: auto; font-size: 13px; }
+        .form-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .form-row input, .form-row select { margin: 0; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+        .modal-content { background: white; margin: 10% auto; padding: 30px; border-radius: 8px; width: 90%; max-width: 500px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .close { font-size: 28px; font-weight: bold; cursor: pointer; }
+        .section-title { margin-bottom: 10px; font-size: 18px; }
+        .flex-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+        .flex-row > * { flex: 1; }
+        .flex-row button { flex: 0 0 auto; }
+        #consumptionChartContainer { margin-top: 20px; }
+    </style>
+</head>
+<body>
+<!-- Login Page -->
+<div id="loginPage" class="login-form">
+    <div class="card">
+        <h2>Login</h2>
+        <div id="loginError" class="error hidden"></div>
+        <input type="text" id="username" placeholder="Username" value="admin">
+        <input type="password" id="password" placeholder="Password" value="admin123">
+        <button onclick="login()">Login</button>
+    </div>
+</div>
+
+<!-- Dashboard (Admin & Client) -->
+<div id="adminPage" class="hidden">
+    <div class="header">
+        <h1 id="dashboardTitle">Energy Management System</h1>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+        <div style="clear: both;"></div>
+    </div>
+    <div class="container">
+        <!-- Users Section (ADMIN only) -->
+        <div class="card" id="usersCard">
+            <h2>Users Management</h2>
+            <button class="btn-small btn-success" onclick="showCreateUserModal()">+ Create User</button>
+            <div id="usersError" class="error hidden"></div>
+            <table>
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Address</th>
+                    <th>Age</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody id="usersBody"></tbody>
+            </table>
+        </div>
+
+        <!-- Devices Section (ADMIN & CLIENT) -->
+        <div class="card" id="devicesCard">
+            <h2 id="devicesTitle">Devices Management</h2>
+            <button class="btn-small btn-success" id="createDeviceBtn" onclick="showCreateDeviceModal()">+ Create Device</button>
+            <div id="devicesError" class="error hidden"></div>
+            <table>
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Max Consumption Value</th>
+                    <th id="assignedUserHeader">Assigned User</th>
+                    <th id="actionsHeader">Actions</th>
+                </tr>
+                </thead>
+                <tbody id="devicesBody"></tbody>
+            </table>
+        </div>
+
+        <!-- Monitoring Section (CLIENT only) -->
+        <div class="card hidden" id="monitoringCard">
+            <h2>Energy Consumption Monitoring</h2>
+            <p class="section-title">View your device's hourly energy consumption for a selected day.</p>
+
+            <div id="monitoringError" class="error hidden"></div>
+            <div id="monitoringInfo" class="success hidden"></div>
+
+            <div class="flex-row">
+                <div>
+                    <label for="monitoringDeviceSelect">Device:</label>
+                    <select id="monitoringDeviceSelect">
+                        <option value="">Select your device</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="monitoringDateInput">Day:</label>
+                    <input type="date" id="monitoringDateInput">
+                </div>
+                <div>
+                    <button id="loadConsumptionBtn" onclick="loadDailyConsumption()">Load Consumption</button>
+                </div>
+            </div>
+
+            <div id="consumptionChartContainer">
+                <canvas id="consumptionChart" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Modal -->
+<div id="userModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="userModalTitle">Create User</h2>
+            <span class="close" onclick="closeUserModal()">&times;</span>
+        </div>
+        <input type="hidden" id="userId">
+        <input type="text" id="userName" placeholder="Name">
+        <input type="text" id="userUsername" placeholder="Username">
+        <input type="password" id="userPassword" placeholder="Password">
+        <select id="userRole">
+            <option value="">Select Role</option>
+            <option value="ADMIN">Admin</option>
+            <option value="CLIENT">Client</option>
+        </select>
+        <input type="number" id="userAge" placeholder="Age (min 18)">
+        <input type="text" id="userAddress" placeholder="Address">
+        <button onclick="saveUser()">Save</button>
+    </div>
+</div>
+
+<!-- Device Modal -->
+<div id="deviceModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="deviceModalTitle">Create Device</h2>
+            <span class="close" onclick="closeDeviceModal()">&times;</span>
+        </div>
+        <input type="hidden" id="deviceId">
+        <input type="text" id="deviceDescription" placeholder="Device Name">
+        <input type="number" id="deviceMaxConsumption" placeholder="Max Consumption Value (min 0)">
+        <button onclick="saveDevice()">Save</button>
+    </div>
+</div>
+
+<!-- Assign Device Modal -->
+<div id="assignModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Assign Device to User</h2>
+            <span class="close" onclick="closeAssignModal()">&times;</span>
+        </div>
+        <input type="hidden" id="assignDeviceId">
+        <select id="assignUserId">
+            <option value="">Select User</option>
+        </select>
+        <button onclick="assignDevice()">Assign</button>
+    </div>
+</div>
+
+<script>
+    // =========================
+    // Global state
+    // =========================
+    let token = localStorage.getItem('token');
+    let userRole = localStorage.getItem('role');
+    let currentUserId = localStorage.getItem('userId');
+    let currentUsername = localStorage.getItem('username');
+    let allUsers = [];
+    let currentDevices = [];
+    let consumptionChart = null;
+
+    // Dacă există deja token, mergem direct în dashboard
+    if (token) {
+        showDashboard();
+    }
+
+    // =========================
+    // Auth
+    // =========================
+    async function login() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const errorDiv = document.getElementById('loginError');
+
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            if (!response.ok) throw new Error('Login failed');
+
+            const data = await response.json();
+
+            token = data.token;
+            userRole = data.role;
+            currentUsername = data.username;
+            currentUserId = data.userId;
+
+            localStorage.setItem('token', token);
+            localStorage.setItem('role', userRole);
+            localStorage.setItem('username', currentUsername);
+            localStorage.setItem('userId', currentUserId);
+
+            errorDiv.classList.add('hidden');
+            showDashboard();
+        } catch (error) {
+            errorDiv.textContent = 'Invalid username or password';
+            errorDiv.classList.remove('hidden');
+        }
+    }
+
+    function logout() {
+        localStorage.clear();
+        token = null;
+        userRole = null;
+        currentUserId = null;
+        currentUsername = null;
+        document.getElementById('adminPage').classList.add('hidden');
+        document.getElementById('loginPage').classList.remove('hidden');
+        location.reload();
+    }
+
+    // =========================
+    // Dashboard (Admin & Client)
+    // =========================
+    async function showDashboard() {
+        document.getElementById('loginPage').classList.add('hidden');
+        document.getElementById('adminPage').classList.remove('hidden');
+
+        userRole = localStorage.getItem('role');
+        currentUsername = localStorage.getItem('username');
+
+        const dashboardTitle = document.getElementById('dashboardTitle');
+        const usersCard = document.getElementById('usersCard');
+        const devicesTitle = document.getElementById('devicesTitle');
+        const assignedHeader = document.getElementById('assignedUserHeader');
+        const actionsHeader = document.getElementById('actionsHeader');
+        const createDeviceBtn = document.getElementById('createDeviceBtn');
+        const monitoringCard = document.getElementById('monitoringCard');
+
+        if (userRole === 'CLIENT') {
+            // CLIENT VIEW
+            if (dashboardTitle) {
+                dashboardTitle.textContent = 'My Devices - ' + (currentUsername || '');
+            }
+            if (usersCard) {
+                usersCard.remove(); // clientul nu vede management de useri
+            }
+            if (devicesTitle) {
+                devicesTitle.textContent = 'My Assigned Devices';
+            }
+            if (assignedHeader) {
+                assignedHeader.style.display = 'none';
+            }
+            if (actionsHeader) {
+                actionsHeader.textContent = 'Actions';
+            }
+            if (createDeviceBtn) {
+                createDeviceBtn.style.display = 'none'; // clientul nu creează device-uri
+            }
+            if (monitoringCard) {
+                monitoringCard.classList.remove('hidden'); // clientul vede monitoring
+            }
+
+            await loadUsers();   // avem nevoie de users pentru a map-a userId / username
+            await loadDevices(); // va filtra device-urile pentru client
+
+            initMonitoringControls();
+        } else {
+            // ADMIN VIEW
+            if (dashboardTitle) {
+                dashboardTitle.textContent = 'Energy Management System - Admin';
+            }
+            if (assignedHeader) {
+                assignedHeader.style.display = 'table-cell';
+            }
+            if (createDeviceBtn) {
+                createDeviceBtn.style.display = 'inline-block';
+            }
+            if (monitoringCard) {
+                monitoringCard.classList.add('hidden'); // optional: admin nu vede monitoring
+            }
+
+            await loadUsers();
+            await loadDevices();
+        }
+    }
+
+    // =========================
+    // Users
+    // =========================
+    async function loadUsers() {
+        try {
+            const response = await fetch('/api/users', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Failed to load users');
+            allUsers = await response.json();
+
+            const tbody = document.getElementById('usersBody');
+            if (!tbody) return; // dacă e client, nu există tabel users
+
+            tbody.innerHTML = allUsers.map(user => `
+                    <tr>
+                        <td>${user.id.substring(0, 8)}...</td>
+                        <td>${user.username || 'N/A'}</td>
+                        <td>${user.name || 'N/A'}</td>
+                        <td>${user.role || 'N/A'}</td>
+                        <td>${user.address || 'N/A'}</td>
+                        <td>${user.age || 'N/A'}</td>
+                        <td>
+                            <button class="btn-small btn-warning" onclick='editUser(${JSON.stringify(user)})'>Edit</button>
+                            <button class="btn-small btn-danger" onclick="deleteUser('${user.id}')">Delete</button>
+                        </td>
+                    </tr>
+                `).join('');
+        } catch (error) {
+            const usersError = document.getElementById('usersError');
+            if (usersError) {
+                usersError.textContent = 'Failed to load users: ' + error.message;
+                usersError.classList.remove('hidden');
+            }
+        }
+    }
+
+    function showCreateUserModal() {
+        document.getElementById('userModalTitle').textContent = 'Create User';
+        document.getElementById('userId').value = '';
+        document.getElementById('userName').value = '';
+        document.getElementById('userUsername').value = '';
+        document.getElementById('userPassword').value = '';
+        document.getElementById('userRole').value = '';
+        document.getElementById('userAge').value = '';
+        document.getElementById('userAddress').value = '';
+        document.getElementById('userModal').style.display = 'block';
+    }
+
+    function editUser(user) {
+        document.getElementById('userModalTitle').textContent = 'Edit User';
+        document.getElementById('userId').value = user.id;
+        document.getElementById('userName').value = user.name || '';
+        document.getElementById('userUsername').value = user.username || '';
+        document.getElementById('userPassword').value = ''; // nu afișăm parola
+        document.getElementById('userRole').value = user.role || '';
+        document.getElementById('userAge').value = user.age || '';
+        document.getElementById('userAddress').value = user.address || '';
+        document.getElementById('userModal').style.display = 'block';
+    }
+
+    function closeUserModal() {
+        document.getElementById('userModal').style.display = 'none';
+    }
+
+    async function saveUser() {
+        const id = document.getElementById('userId').value;
+        const userData = {
+            name: document.getElementById('userName').value,
+            username: document.getElementById('userUsername').value,
+            password: document.getElementById('userPassword').value,
+            role: document.getElementById('userRole').value,
+            age: parseInt(document.getElementById('userAge').value),
+            address: document.getElementById('userAddress').value
+        };
+
+        try {
+            const url = id ? `/api/users/${id}` : '/api/users';
+            const method = id ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(userData)
+            });
+
+            if (!response.ok) throw new Error('Failed to save user');
+
+            closeUserModal();
+            loadUsers();
+        } catch (error) {
+            alert('Failed to save user: ' + error.message);
+        }
+    }
+
+    async function deleteUser(id) {
+        if (!confirm('Delete this user?')) return;
+        try {
+            const response = await fetch(`/api/users/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Failed to delete');
+            loadUsers();
+        } catch (error) {
+            alert('Failed to delete user: ' + error.message);
+        }
+    }
+
+    // =========================
+    // Devices
+    // =========================
+    async function loadDevices() {
+        try {
+            const response = await fetch('/api/devices', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) throw new Error('Failed to load devices');
+
+            let devices = await response.json();
+            currentDevices = devices; // stocăm lista completă (important pentru client & monitoring)
+
+            const tbody = document.getElementById('devicesBody');
+            const devicesError = document.getElementById('devicesError');
+
+            devicesError.classList.add('hidden');
+
+            // Determinăm dacă suntem client
+            const role = userRole || localStorage.getItem('role');
+            const username = currentUsername || localStorage.getItem('username');
+
+            let clientUserUUID = null;
+            if (role === 'CLIENT' && allUsers.length > 0) {
+                const currentUser = allUsers.find(u => u.username === username);
+                if (currentUser) {
+                    clientUserUUID = currentUser.id;
+                }
+            }
+
+            if (role === 'CLIENT') {
+                if (clientUserUUID) {
+                    devices = devices.filter(device => device.userId === clientUserUUID);
+                } else {
+                    devices = [];
+                }
+            }
+
+            currentDevices = devices; // actualizăm lista vizibilă pentru client (folosită de monitoring)
+
+            tbody.innerHTML = devices.map(device => {
+                const assignedUser = device.userId ? allUsers.find(u => u.id === device.userId) : null;
+                const userName = assignedUser ? assignedUser.name : (device.userId ? 'Unknown User' : 'Unassigned');
+
+                const isAdmin = (role === 'ADMIN');
+
+                const assignedUserCell = isAdmin ? `<td>${userName}</td>` : '';
+
+                const actionButtons = isAdmin ? `
+                        <button class="btn-small btn-warning" onclick='editDevice(${JSON.stringify(device)})'>Edit</button>
+                        <button class="btn-small btn-success" onclick="showAssignModal('${device.id}')">Assign</button>
+                        <button class="btn-small btn-danger" onclick="deleteDevice('${device.id}')">Delete</button>
+                    ` : '-';
+
+                return `
+                        <tr>
+                            <td>${device.id.substring(0, 8)}...</td>
+                            <td>${device.name || 'N/A'}</td>
+                            <td>${device.maximumConsumptionValue || 'N/A'}</td>
+                            ${assignedUserCell}
+                            <td>${actionButtons}</td>
+                        </tr>
+                    `;
+            }).join('');
+
+            // Dacă suntem client, actualizăm și dropdown-ul de monitoring
+            if (role === 'CLIENT') {
+                populateMonitoringDeviceSelect();
+            }
+        } catch (error) {
+            const devicesError = document.getElementById('devicesError');
+            devicesError.textContent = 'Failed to load devices: ' + error.message;
+            devicesError.classList.remove('hidden');
+        }
+    }
+
+    function showCreateDeviceModal() {
+        document.getElementById('deviceModalTitle').textContent = 'Create Device';
+        document.getElementById('deviceId').value = '';
+        document.getElementById('deviceDescription').value = '';
+        document.getElementById('deviceMaxConsumption').value = '';
+        document.getElementById('deviceModal').style.display = 'block';
+    }
+
+    function editDevice(device) {
+        document.getElementById('deviceModalTitle').textContent = 'Edit Device';
+        document.getElementById('deviceId').value = device.id;
+        document.getElementById('deviceDescription').value = device.name || '';
+        document.getElementById('deviceMaxConsumption').value = device.maximumConsumptionValue || '';
+        document.getElementById('deviceModal').style.display = 'block';
+    }
+
+    function closeDeviceModal() {
+        document.getElementById('deviceModal').style.display = 'none';
+    }
+
+    async function saveDevice() {
+        const id = document.getElementById('deviceId').value;
+        const deviceData = {
+            name: document.getElementById('deviceDescription').value,
+            maximumConsumptionValue: parseInt(document.getElementById('deviceMaxConsumption').value)
+        };
+
+        try {
+            const url = id ? `/api/devices/${id}` : '/api/devices';
+            const method = id ? 'PUT' : 'POST';
+            const role = userRole || localStorage.getItem('role') || 'USER';
+
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'X-User-Role': role
+                },
+                body: JSON.stringify(deviceData)
+            });
+
+            if (!response.ok) throw new Error('Failed to save device');
+
+            closeDeviceModal();
+            loadDevices();
+        } catch (error) {
+            alert('Failed to save device: ' + error.message);
+        }
+    }
+
+    async function deleteDevice(id) {
+        if (!confirm('Delete this device?')) return;
+        try {
+            const response = await fetch(`/api/devices/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'X-User-Role': userRole || localStorage.getItem('role') || 'USER'
+                }
+            });
+            if (!response.ok) throw new Error('Failed to delete');
+            loadDevices();
+        } catch (error) {
+            alert('Failed to delete device: ' + error.message);
+        }
+    }
+
+    // =========================
+    // Device Assignment (Admin)
+    // =========================
+    function showAssignModal(deviceId) {
+        document.getElementById('assignDeviceId').value = deviceId;
+        const select = document.getElementById('assignUserId');
+        select.innerHTML = '<option value="">Select User</option>' +
+            allUsers.map(user => `<option value="${user.id}">${user.name} (Age: ${user.age})</option>`).join('');
+        document.getElementById('assignModal').style.display = 'block';
+    }
+
+    function closeAssignModal() {
+        document.getElementById('assignModal').style.display = 'none';
+    }
+
+    async function assignDevice() {
+        const deviceId = document.getElementById('assignDeviceId').value;
+        const userId = document.getElementById('assignUserId').value;
+
+        if (!userId) {
+            alert('Please select a user');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/devices/${deviceId}/assign/${userId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'X-User-Role': userRole || localStorage.getItem('role') || 'USER'
+                }
+            });
+
+            if (!response.ok) throw new Error('Failed to assign device');
+
+            closeAssignModal();
+            loadDevices();
+        } catch (error) {
+            alert('Failed to assign device: ' + error.message);
+        }
+    }
+
+    // =========================
+    // Monitoring (Client)
+    // =========================
+    function initMonitoringControls() {
+        const dateInput = document.getElementById('monitoringDateInput');
+        if (dateInput) {
+            // Setăm data curentă
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.value = today;
+        }
+        populateMonitoringDeviceSelect();
+    }
+
+    function populateMonitoringDeviceSelect() {
+        const select = document.getElementById('monitoringDeviceSelect');
+        if (!select) return;
+
+        const devices = currentDevices || [];
+        select.innerHTML = '<option value="">Select your device</option>' +
+            devices.map(d => `<option value="${d.id}">${d.name || d.id.substring(0, 8) + '...'}</option>`).join('');
+    }
+
+    async function loadDailyConsumption() {
+        const deviceSelect = document.getElementById('monitoringDeviceSelect');
+        const dateInput = document.getElementById('monitoringDateInput');
+        const errorDiv = document.getElementById('monitoringError');
+        const infoDiv = document.getElementById('monitoringInfo');
+
+        errorDiv.classList.add('hidden');
+        infoDiv.classList.add('hidden');
+
+        const deviceId = deviceSelect.value;
+        const date = dateInput.value;
+
+        if (!deviceId) {
+            errorDiv.textContent = 'Please select a device.';
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
+        if (!date) {
+            errorDiv.textContent = 'Please select a date.';
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
+        try {
+            const url = `/api/monitoring/consumption?deviceId=${encodeURIComponent(deviceId)}&date=${encodeURIComponent(date)}`;
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load consumption data');
+            }
+
+            const data = await response.json();
+
+            if (!Array.isArray(data) || data.length === 0) {
+                infoDiv.textContent = 'No consumption data for this day.';
+                infoDiv.classList.remove('hidden');
+                renderConsumptionChart([]);
+                return;
+            }
+
+            renderConsumptionChart(data);
+        } catch (error) {
+            errorDiv.textContent = 'Error loading consumption data: ' + error.message;
+            errorDiv.classList.remove('hidden');
+        }
+    }
+
+    function renderConsumptionChart(data) {
+        const ctx = document.getElementById('consumptionChart').getContext('2d');
+
+        const labels = data.map(d => d.hour.toString().padStart(2, '0') + ':00');
+        const values = data.map(d => d.energyKwh);
+
+        if (consumptionChart) {
+            consumptionChart.destroy();
+        }
+
+        consumptionChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Energy consumption (kWh)',
+                    data: values,
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Hour'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'kWh'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true
+                    },
+                    tooltip: {
+                        enabled: true
+                    }
+                }
+            }
+        });
+    }
+
+    // =========================
+    // Close modals on outside click
+    // =========================
+    window.onclick = function(event) {
+        const userModal = document.getElementById('userModal');
+        const deviceModal = document.getElementById('deviceModal');
+        const assignModal = document.getElementById('assignModal');
+
+        if (event.target === userModal) {
+            closeUserModal();
+        }
+        if (event.target === deviceModal) {
+            closeDeviceModal();
+        }
+        if (event.target === assignModal) {
+            closeAssignModal();
+        }
+    }
+</script>
+</body>
+</html>

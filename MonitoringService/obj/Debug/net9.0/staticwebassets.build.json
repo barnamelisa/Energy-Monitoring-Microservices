@@ -1,0 +1,12 @@
+{
+  "Version": 1,
+  "Hash": "4KUvDp5AaGnnIVn9dSSGRh6rR8fZczgQG2UkZuLhaE0=",
+  "Source": "MonitoringService",
+  "BasePath": "_content/MonitoringService",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": [],
+  "Endpoints": []
+}
